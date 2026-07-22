@@ -5,7 +5,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "message")
+@Table(name = "messages") // Changed from "message" to "messages" to match your DB error
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -14,7 +14,6 @@ public class Message {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Explicitly mapping these to match your SQL columns: receiver_id, sender_id
     @Column(name = "sender_id")
     private Long senderId;
 
@@ -24,8 +23,14 @@ public class Message {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    private LocalDateTime timestamp = LocalDateTime.now();
+    private LocalDateTime timestamp;
 
     @Column(name = "is_read", nullable = false)
     private Boolean read = false;
+
+    // Ensure timestamp is initialized before persisting
+    @PrePersist
+    protected void onCreate() {
+        this.timestamp = LocalDateTime.now();
+    }
 }

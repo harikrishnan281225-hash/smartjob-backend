@@ -1,5 +1,6 @@
 package com.smartjob.service;
 
+import com.smartjob.dto.JobData; // Correct import: uses your standalone DTO file
 import com.smartjob.entity.Application;
 import com.smartjob.entity.Job;
 import com.smartjob.entity.User;
@@ -24,42 +25,50 @@ public class JobService {
     @Autowired
     private ApplicationRepository applicationRepository;
 
-    /**
-     * Logic for assigning an existing job to a list of users.
-     * UPDATED: jobId parameter is now String to match the JSearch hash format.
-     */
     @Transactional
-    public void assignJobToUsers(String jobId, List<Long> userIds) {
-        System.out.println("DEBUG: Assigning job ID " + jobId + " to " +
-                (userIds != null ? userIds.size() : 0) + " users.");
-
-        // Find the job using String ID
-        Job job = jobRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Job not found with id: " + jobId));
-
+    public void assignJobToUsers(JobData jobData, List<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             return;
         }
 
+        // 1. Check if job exists, if not, save it to the database
+        Job job = jobRepository.findById(jobData.getId())
+                .orElseGet(() -> {
+                    Job newJob = new Job();
+                    newJob.setId(jobData.getId());
+                    newJob.setTitle(jobData.getTitle());
+                    newJob.setCompanyName(jobData.getCompanyName() != null ? jobData.getCompanyName() : "Unknown");
+                    newJob.setLocation(jobData.getLocation() != null ? jobData.getLocation() : "Unknown");
+
+                    // Safe handling of nulls to prevent DB Constraint errors
+                    newJob.setDescription(jobData.getDescription() != null ? jobData.getDescription() : "No description provided.");
+
+                    newJob.setUrl(jobData.getUrl());
+                    newJob.setSalary(jobData.getSalary());
+                    newJob.setExperienceRequired(jobData.getExperienceRequired());
+                    newJob.setSkillsRequired(jobData.getSkillsRequired());
+                    newJob.setStatus("ASSIGNED");
+
+                    return jobRepository.save(newJob);
+                });
+
+        // 2. Iterate through users and create applications
         for (Long userId : userIds) {
-            // Find the user
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+            try {
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
 
-            // Check if this user is already assigned to this job
-            // Using the updated repository method that accepts String jobId
-            Application existingAssignment = applicationRepository.findByUserIdAndJobId(userId, jobId);
+                Application existingAssignment = applicationRepository.findByUserIdAndJobId(userId, jobData.getId());
 
-            if (existingAssignment == null) {
-                Application application = new Application();
-                application.setUser(user);
-                application.setJob(job);
-                application.setStatus("ASSIGNED");
-
-                applicationRepository.save(application);
-                System.out.println("DEBUG: Successfully assigned job " + jobId + " to user ID: " + userId);
-            } else {
-                System.out.println("DEBUG: User " + userId + " is already assigned to job " + jobId + ". Skipping.");
+                if (existingAssignment == null) {
+                    Application application = new Application();
+                    application.setUser(user);
+                    application.setJob(job);
+                    application.setStatus("ASSIGNED");
+                    applicationRepository.save(application);
+                }
+            } catch (Exception e) {
+                System.err.println("ERROR: Could not assign job to user " + userId + ": " + e.getMessage());
             }
         }
     }

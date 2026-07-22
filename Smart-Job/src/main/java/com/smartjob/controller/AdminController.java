@@ -25,6 +25,7 @@ public class AdminController {
     @Autowired private JobService jobService;
     @Autowired private ApplicationRepository applicationRepository;
 
+    // --- 1. Dashboard Stats ---
     @GetMapping("/dashboard-stats")
     public ResponseEntity<Map<String, Long>> getDashboardStats() {
         Map<String, Long> stats = new HashMap<>();
@@ -35,8 +36,7 @@ public class AdminController {
         return ResponseEntity.ok(stats);
     }
 
-    // Inside AdminController.java
-
+    // --- 2. User Profile Stats ---
     @GetMapping("/user-profile-stats/{id}")
     public ResponseEntity<Map<String, Object>> getUserProfileStats(@PathVariable Long id) {
         return userRepository.findById(id)
@@ -48,6 +48,7 @@ public class AdminController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // --- 3. Job Stats ---
     @GetMapping("/job-stats")
     public ResponseEntity<Map<String, Long>> getJobStats() {
         Map<String, Long> stats = new HashMap<>();
@@ -57,6 +58,7 @@ public class AdminController {
         return ResponseEntity.ok(stats);
     }
 
+    // --- 4. Recent Activity ---
     @GetMapping("/recent-activity")
     public ResponseEntity<List<ApplicationDTO>> getRecentActivity() {
         var appPage = applicationRepository.findTop5WithDetails(PageRequest.of(0, 5));
@@ -73,38 +75,20 @@ public class AdminController {
         return ResponseEntity.ok(dtoList);
     }
 
+    // --- 5. All Users ---
+    @GetMapping("/users")
+    public ResponseEntity<List<User>> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll());
+    }
+
+    // --- POST & BROADCAST LOGIC ---
     @PostMapping("/post-job")
     public ResponseEntity<String> postJob(@RequestBody PostJobRequest request) {
         if (request.getJob() == null || request.getJob().getTitle() == null) {
             return ResponseEntity.badRequest().body("Job details or title are missing.");
         }
-
-        PostJobRequest.JobData jobData = request.getJob();
-        Job newJob = new Job();
-
-        String jobId = (jobData.getId() != null && !jobData.getId().isEmpty())
-                ? jobData.getId()
-                : UUID.randomUUID().toString();
-
-        newJob.setId(jobId);
-        newJob.setTitle(jobData.getTitle());
-        newJob.setCompanyName(jobData.getCompanyName() != null ? jobData.getCompanyName() : "Unknown");
-        newJob.setLocation(jobData.getLocation() != null ? jobData.getLocation() : "Remote");
-
-        newJob.setSalary(jobData.getSalary());
-        newJob.setExperienceRequired(jobData.getExperienceRequired());
-        newJob.setDescription(jobData.getDescription());
-        newJob.setSkillsRequired(jobData.getSkillsRequired());
-        newJob.setUrl(jobData.getUrl());
-
-        newJob.setStatus(request.getUserIds() != null && !request.getUserIds().isEmpty() ? "Assigned" : "Posted");
-
-        Job savedJob = jobRepository.save(newJob);
-
-        if (request.getUserIds() != null && !request.getUserIds().isEmpty()) {
-            jobService.assignJobToUsers(savedJob.getId(), request.getUserIds());
-        }
-        return ResponseEntity.ok("Job posted successfully with ID: " + savedJob.getId());
+        jobService.assignJobToUsers(request.getJob(), request.getUserIds());
+        return ResponseEntity.ok("Job processed successfully.");
     }
 
     @PostMapping("/assign-job")
@@ -112,27 +96,37 @@ public class AdminController {
         if (request.getJob() == null || request.getJob().getId() == null) {
             return ResponseEntity.badRequest().body("Job ID is required for assignment.");
         }
-
-        JobAssignmentRequest.JobData data = request.getJob();
-        Job job = jobRepository.findById(data.getId()).orElseGet(() -> {
-            Job newJob = new Job();
-            newJob.setId(data.getId());
-            newJob.setTitle(data.getTitle());
-            newJob.setCompanyName(data.getCompanyName() != null ? data.getCompanyName() : "Unknown");
-            newJob.setLocation(data.getLocation() != null ? data.getLocation() : "Remote");
-            newJob.setDescription(data.getDescription());
-            newJob.setUrl(data.getUrl());
-            newJob.setStatus("Assigned");
-            return jobRepository.save(newJob);
-        });
-
-        jobService.assignJobToUsers(job.getId(), request.getUserIds());
-        return ResponseEntity.ok("Job assigned successfully.");
+        jobService.assignJobToUsers(request.getJob(), request.getUserIds());
+        return ResponseEntity.ok("Job assigned successfully to " + request.getUserIds().size() + " users.");
     }
 
-    @GetMapping("/users")
-    public ResponseEntity<List<User>> getAllUsers() {
-        return ResponseEntity.ok(userRepository.findAll());
+    @PostMapping("/broadcast")
+    public ResponseEntity<String> broadcastMessage(@RequestBody BroadcastRequest request) {
+        // 1. Validate incoming list
+        if (request.getUserIds() == null || request.getUserIds().isEmpty()) {
+            return ResponseEntity.badRequest().body("No users selected for broadcast.");
+        }
+
+        // 2. Debugging: Log IDs to console to verify the frontend sent the full list
+        System.out.println("DEBUG: Broadcasting to IDs: " + request.getUserIds());
+
+        // 3. Batch processing with error catching
+        int successCount = 0;
+        for (Long userId : request.getUserIds()) {
+            try {
+                Message msg = new Message();
+                msg.setReceiverId(userId);
+                msg.setContent(request.getContent());
+                msg.setRead(false);
+                msg.setTimestamp(java.time.LocalDateTime.now());
+                messageRepository.save(msg);
+                successCount++;
+            } catch (Exception e) {
+                System.err.println("Error saving message for user ID " + userId + ": " + e.getMessage());
+            }
+        }
+
+        return ResponseEntity.ok("Successfully sent to " + successCount + " out of " + request.getUserIds().size() + " users.");
     }
 
     @Data

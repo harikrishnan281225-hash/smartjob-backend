@@ -3,22 +3,15 @@ package com.smartjob.dto;
 import lombok.Data;
 import java.util.List;
 
+/**
+ * Request DTO for posting a new job.
+ * Now references the standalone JobData class to ensure type consistency.
+ */
 @Data
 public class PostJobRequest {
 
     private JobData job;
     private List<Long> userIds;
 
-    @Data
-    public static class JobData {
-        private String id;
-        private String title;
-        private String companyName;
-        private String location;
-        private String salary;
-        private String experienceRequired;
-        private String description;
-        private String skillsRequired;
-        private String url;
-    }
+    // REMOVED: The static class JobData block has been deleted from here.
 }

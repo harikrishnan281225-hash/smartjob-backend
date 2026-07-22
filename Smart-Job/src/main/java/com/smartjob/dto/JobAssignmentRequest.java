@@ -7,28 +7,16 @@ import java.util.List;
 
 /**
  * DTO for Job assignment requests.
- * Uses the same JobData structure as PostJobRequest to maintain consistency.
+ * Uses the standalone JobData class for consistent type mapping.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class JobAssignmentRequest {
 
+    // This now correctly references the standalone JobData.java file
     private JobData job;
     private List<Long> userIds;
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class JobData {
-        private String id;
-        private String title;
-        private String companyName;
-        private String location;
-        private String salary;
-        private String experienceRequired;
-        private String description;
-        private String skillsRequired;
-        private String url;
-    }
+    // REMOVED: The nested "public static class JobData" has been deleted.
 }

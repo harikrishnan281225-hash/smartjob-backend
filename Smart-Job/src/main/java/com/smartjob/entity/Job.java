@@ -28,6 +28,7 @@ public class Job {
     @Column(nullable = false)
     private String location;
 
+    // Metadata fields
     private String salary;
     private String experienceRequired;
     private String skillsRequired;
@@ -58,8 +59,7 @@ public class Job {
     private List<Application> applications;
 
     /**
-     * Maps this Entity to a DTO.
-     * Ensure JobDTO has corresponding setters for all these fields.
+     * Maps this Entity to a DTO including all new metadata fields.
      */
     public JobDTO toDTO() {
         JobDTO dto = new JobDTO();
@@ -70,10 +70,12 @@ public class Job {
         dto.setDescription(this.description);
         dto.setUrl(this.url);
         dto.setStatus(this.status);
+
+        // Map new metadata fields
         dto.setSalary(this.salary);
         dto.setExperienceRequired(this.experienceRequired);
         dto.setSkillsRequired(this.skillsRequired);
-        // Correctly handle LocalDate to String conversion for DTO
+
         dto.setPostedDate(this.postedDate != null ? this.postedDate.toString() : null);
         return dto;
     }

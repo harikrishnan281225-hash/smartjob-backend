@@ -25,7 +25,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        String requestURI = request.getRequestURI();
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -35,34 +34,32 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
         try {
-            String username = jwtUtils.extractUsername(token);
+            // DEBUG: See exactly what username is being extracted from the token
+            String extractedUsername = jwtUtils.extractUsername(token);
+            System.out.println("DEBUG: Extracted username from token: " + extractedUsername);
 
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            if (extractedUsername != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(extractedUsername);
 
-                // --- DEBUG: Check Authorities ---
-                System.out.println("DEBUG: UserDetails loaded for " + username);
-                System.out.println("DEBUG: Authorities found: " + userDetails.getAuthorities());
-
+                // Check if the userDetails matches the token subject
                 if (jwtUtils.validateToken(token, userDetails)) {
-                    // This constructor injects the authorities (roles) into the SecurityContext
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
                                     userDetails,
                                     null,
-                                    userDetails.getAuthorities() // Roles come from here!
+                                    userDetails.getAuthorities()
                             );
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
 
-                    System.out.println("DEBUG: SecurityContext successfully set for " + username);
+                    System.out.println("DEBUG: SecurityContext successfully set for: " + userDetails.getUsername());
                 } else {
-                    System.out.println("DEBUG: Token validation failed.");
+                    System.out.println("DEBUG: Token validation FAILED for: " + extractedUsername);
                 }
             }
         } catch (Exception e) {
-            logger.error("Cannot set user authentication: {}", e);
+            logger.error("Cannot set user authentication: ", e);
         }
 
         filterChain.doFilter(request, response);
