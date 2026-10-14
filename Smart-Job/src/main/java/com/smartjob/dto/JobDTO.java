@@ -27,4 +27,11 @@ public class JobDTO {
 
     // Added this field to match the mapping in Job.java
     private String postedDate;
+
+    // FIX FOR LINE 81,82,83 ERROR IN Job.java
+    private String followUpDate; // Line 81 fix
+    private String username;     // Line 82 fix
+    private String postedBy;     // Line 83 fix
+    private Long ownerId;
+    private Long userId;
 }

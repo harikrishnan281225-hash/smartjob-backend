@@ -1,6 +1,6 @@
 package com.smartjob.service;
 
-import com.smartjob.dto.JobData; // Correct import: uses your standalone DTO file
+import com.smartjob.dto.JobData;
 import com.smartjob.entity.Application;
 import com.smartjob.entity.Job;
 import com.smartjob.entity.User;
@@ -11,7 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import java.time.LocalDateTime;
 
 @Service
 public class JobService {
@@ -28,47 +31,51 @@ public class JobService {
     @Transactional
     public void assignJobToUsers(JobData jobData, List<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) {
-            return;
+            throw new RuntimeException("No users selected");
         }
 
-        // 1. Check if job exists, if not, save it to the database
-        Job job = jobRepository.findById(jobData.getId())
-                .orElseGet(() -> {
-                    Job newJob = new Job();
-                    newJob.setId(jobData.getId());
-                    newJob.setTitle(jobData.getTitle());
-                    newJob.setCompanyName(jobData.getCompanyName() != null ? jobData.getCompanyName() : "Unknown");
-                    newJob.setLocation(jobData.getLocation() != null ? jobData.getLocation() : "Unknown");
+        // 1. Check if job exists by URL (don't use external LinkedIn ID as PK)
+        Job job = null;
+        if (jobData.getUrl() != null && !jobData.getUrl().isBlank()) {
+            job = jobRepository.findByUrl(jobData.getUrl()).orElse(null);
+        }
 
-                    // Safe handling of nulls to prevent DB Constraint errors
-                    newJob.setDescription(jobData.getDescription() != null ? jobData.getDescription() : "No description provided.");
+        if (job == null) {
+            Job newJob = new Job();
+            // IMPORTANT: Don't set ID - let Hibernate generate UUID
+            // Save external ID in separate column
+            newJob.setExternalId(jobData.getId());
 
-                    newJob.setUrl(jobData.getUrl());
-                    newJob.setSalary(jobData.getSalary());
-                    newJob.setExperienceRequired(jobData.getExperienceRequired());
-                    newJob.setSkillsRequired(jobData.getSkillsRequired());
-                    newJob.setStatus("ASSIGNED");
+            newJob.setTitle(jobData.getTitle() != null ? jobData.getTitle() : "No Title");
+            newJob.setCompanyName(jobData.getCompanyName() != null ? jobData.getCompanyName() : "Unknown");
+            newJob.setLocation(jobData.getLocation() != null ? jobData.getLocation() : "Remote");
+            newJob.setDescription(jobData.getDescription() != null ? jobData.getDescription() : "No description provided.");
+            newJob.setUrl(jobData.getUrl());
+            newJob.setSalary(jobData.getSalary());
+            newJob.setExperienceRequired(jobData.getExperienceRequired());
+            newJob.setSkillsRequired(jobData.getSkillsRequired());
+            newJob.setStatus("ASSIGNED");
+            newJob.setPostedDate(LocalDate.now());
+            newJob.setPostedBy("ADMIN");
 
-                    return jobRepository.save(newJob);
-                });
+            job = jobRepository.save(newJob);
+        }
 
-        // 2. Iterate through users and create applications
+        // 2. Assign to users - use real DB ID
         for (Long userId : userIds) {
-            try {
-                User user = userRepository.findById(userId)
-                        .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
 
-                Application existingAssignment = applicationRepository.findByUserIdAndJobId(userId, jobData.getId());
+            // Check if already assigned
+            Optional<Application> existingAssignment = applicationRepository.findByUserIdAndJobId(userId, job.getId());
 
-                if (existingAssignment == null) {
-                    Application application = new Application();
-                    application.setUser(user);
-                    application.setJob(job);
-                    application.setStatus("ASSIGNED");
-                    applicationRepository.save(application);
-                }
-            } catch (Exception e) {
-                System.err.println("ERROR: Could not assign job to user " + userId + ": " + e.getMessage());
+            if (existingAssignment.isEmpty()) {
+                Application application = new Application();
+                application.setUser(user);
+                application.setJob(job);
+                application.setStatus("ASSIGNED");
+                application.setAppliedDate(LocalDateTime.now());
+                applicationRepository.save(application);
             }
         }
     }

@@ -1,15 +1,37 @@
 package com.smartjob.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ApplyRequest {
+
+    @JsonAlias({"id", "externalId", "external_id", "linkedinId", "job_id"})
     private String jobId;
+
+    @JsonAlias({"jobTitle", "job_title", "position", "name", "role"})
     private String title;
+
+    @JsonAlias({"company", "company_name", "employer", "organization"})
     private String companyName;
+
+    @JsonAlias({"jobLocation", "place", "city"})
     private String location;
+
+    @JsonAlias({"link", "jobUrl", "job_url"})
     private String url;
+
+    @JsonAlias({"jobDescription", "desc", "summary"})
     private String description;
+
     private String salary;
+
+    @JsonAlias({"skills", "requiredSkills"})
     private String skillsRequired;
+
+    @JsonAlias({"experience", "exp"})
     private String experienceRequired;
+
     private String username;
     private String postedDate;
 
@@ -46,4 +68,9 @@ public class ApplyRequest {
 
     public String getPostedDate() { return postedDate; }
     public void setPostedDate(String postedDate) { this.postedDate = postedDate; }
+
+    @Override
+    public String toString() {
+        return "ApplyRequest{jobId='" + jobId + "', title='" + title + "', companyName='" + companyName + "', location='" + location + "'}";
+    }
 }
